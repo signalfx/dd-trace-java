@@ -94,10 +94,10 @@ public final class AkkaHttpClientInstrumentation extends Instrumenter.Default {
                 .withTag(Tags.HTTP_METHOD.getKey(), request.method().value())
                 .withTag(Tags.HTTP_URL.getKey(), request.getUri().toString());
       }
-      Scope scope = builder.startActive(false);
+      final Scope scope = builder.startActive(false);
 
       if (request != null) {
-        AkkaHttpHeaders headers = new AkkaHttpHeaders(request);
+        final AkkaHttpHeaders headers = new AkkaHttpHeaders(request);
         GlobalTracer.get().inject(scope.span().context(), Format.Builtin.HTTP_HEADERS, headers);
         // Request is immutable, so we have to assign new value once we update headers
         request = headers.getRequest();
@@ -113,7 +113,7 @@ public final class AkkaHttpClientInstrumentation extends Instrumenter.Default {
         @Advice.Return final Future<HttpResponse> responseFuture,
         @Advice.Enter final Scope scope,
         @Advice.Thrown final Throwable throwable) {
-      Span span = scope.span();
+      final Span span = scope.span();
       if (throwable == null) {
         responseFuture.onComplete(new OnCompleteHandler(span), thiz.system().dispatcher());
       } else {
@@ -137,12 +137,12 @@ public final class AkkaHttpClientInstrumentation extends Instrumenter.Default {
   public static class OnCompleteHandler extends AbstractFunction1<Try<HttpResponse>, Void> {
     private final Span span;
 
-    public OnCompleteHandler(Span span) {
+    public OnCompleteHandler(final Span span) {
       this.span = span;
     }
 
     @Override
-    public Void apply(Try<HttpResponse> result) {
+    public Void apply(final Try<HttpResponse> result) {
       if (result.isSuccess()) {
         Tags.HTTP_STATUS.set(span, result.get().status().intValue());
       } else {
@@ -157,7 +157,7 @@ public final class AkkaHttpClientInstrumentation extends Instrumenter.Default {
   public static class AkkaHttpHeaders implements TextMap {
     private HttpRequest request;
 
-    public AkkaHttpHeaders(HttpRequest request) {
+    public AkkaHttpHeaders(final HttpRequest request) {
       this.request = request;
     }
 

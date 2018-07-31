@@ -36,7 +36,7 @@ public final class JaxRsClientInstrumentation extends Instrumenter.Default {
 
   @Override
   public Map<ElementMatcher, String> transformers() {
-    Map<ElementMatcher, String> transformers = new HashMap<>();
+    final Map<ElementMatcher, String> transformers = new HashMap<>();
     transformers.put(
         named("build").and(returns(hasSuperType(named("javax.ws.rs.client.Client")))),
         ClientBuilderAdvice.class.getName());

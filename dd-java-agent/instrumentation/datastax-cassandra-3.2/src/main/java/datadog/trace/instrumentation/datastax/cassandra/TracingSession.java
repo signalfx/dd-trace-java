@@ -13,7 +13,11 @@
  */
 package datadog.trace.instrumentation.datastax.cassandra;
 
-import static io.opentracing.log.Fields.*;
+import static io.opentracing.log.Fields.ERROR_KIND;
+import static io.opentracing.log.Fields.ERROR_OBJECT;
+import static io.opentracing.log.Fields.EVENT;
+import static io.opentracing.log.Fields.MESSAGE;
+import static io.opentracing.log.Fields.STACK;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.CloseFuture;

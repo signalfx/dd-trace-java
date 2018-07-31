@@ -36,7 +36,7 @@ public class HystrixCommandInstrumentation extends Instrumenter.Default {
 
   @Override
   public Map<ElementMatcher, String> transformers() {
-    Map<ElementMatcher, String> transformers = new HashMap<>();
+    final Map<ElementMatcher, String> transformers = new HashMap<>();
     transformers.put(
         isMethod().and(named("run").or(named("getFallback"))), TraceAdvice.class.getName());
     return transformers;

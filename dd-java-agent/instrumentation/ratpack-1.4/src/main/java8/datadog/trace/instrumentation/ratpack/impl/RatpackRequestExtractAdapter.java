@@ -1,7 +1,8 @@
 package datadog.trace.instrumentation.ratpack.impl;
 
 import io.opentracing.propagation.TextMap;
-import java.util.*;
+import java.util.Iterator;
+import java.util.Map;
 import ratpack.http.Request;
 import ratpack.util.MultiValueMap;
 

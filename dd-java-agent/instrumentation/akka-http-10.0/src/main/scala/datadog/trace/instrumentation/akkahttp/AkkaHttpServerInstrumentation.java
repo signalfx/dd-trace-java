@@ -94,13 +94,13 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
     public static void wrapHandler(
         @Advice.Argument(value = 0, readOnly = false)
             Function1<HttpRequest, scala.concurrent.Future<HttpResponse>> handler,
-        @Advice.Argument(value = 7) Materializer materializer) {
+        @Advice.Argument(value = 7) final Materializer materializer) {
       handler = new DatadogAsyncWrapper(handler, materializer.executionContext());
     }
   }
 
   public static class DatadogWrapperHelper {
-    public static Scope createSpan(HttpRequest request) {
+    public static Scope createSpan(final HttpRequest request) {
       final SpanContext extractedContext =
           GlobalTracer.get()
               .extract(Format.Builtin.HTTP_HEADERS, new AkkaHttpServerHeaders(request));
@@ -121,7 +121,7 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
       return scope;
     }
 
-    public static void finishSpan(Span span, HttpResponse response) {
+    public static void finishSpan(final Span span, final HttpResponse response) {
       Tags.HTTP_STATUS.set(span, response.status().intValue());
 
       if (GlobalTracer.get().scopeManager().active() instanceof TraceScope) {
@@ -130,7 +130,7 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
       span.finish();
     }
 
-    public static void finishSpan(Span span, Throwable t) {
+    public static void finishSpan(final Span span, final Throwable t) {
       Tags.ERROR.set(span, true);
       span.log(Collections.singletonMap(ERROR_OBJECT, t));
       Tags.HTTP_STATUS.set(span, 500);
@@ -145,19 +145,19 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
   public static class DatadogSyncWrapper extends AbstractFunction1<HttpRequest, HttpResponse> {
     private final Function1<HttpRequest, HttpResponse> userHandler;
 
-    public DatadogSyncWrapper(Function1<HttpRequest, HttpResponse> userHandler) {
+    public DatadogSyncWrapper(final Function1<HttpRequest, HttpResponse> userHandler) {
       this.userHandler = userHandler;
     }
 
     @Override
-    public HttpResponse apply(HttpRequest request) {
+    public HttpResponse apply(final HttpRequest request) {
       final Scope scope = DatadogWrapperHelper.createSpan(request);
       try {
         final HttpResponse response = userHandler.apply(request);
         scope.close();
         DatadogWrapperHelper.finishSpan(scope.span(), response);
         return response;
-      } catch (Throwable t) {
+      } catch (final Throwable t) {
         scope.close();
         DatadogWrapperHelper.finishSpan(scope.span(), t);
         throw t;
@@ -171,19 +171,19 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
     private final ExecutionContext executionContext;
 
     public DatadogAsyncWrapper(
-        Function1<HttpRequest, Future<HttpResponse>> userHandler,
-        ExecutionContext executionContext) {
+        final Function1<HttpRequest, Future<HttpResponse>> userHandler,
+        final ExecutionContext executionContext) {
       this.userHandler = userHandler;
       this.executionContext = executionContext;
     }
 
     @Override
-    public Future<HttpResponse> apply(HttpRequest request) {
+    public Future<HttpResponse> apply(final HttpRequest request) {
       final Scope scope = DatadogWrapperHelper.createSpan(request);
       Future<HttpResponse> futureResponse = null;
       try {
         futureResponse = userHandler.apply(request);
-      } catch (Throwable t) {
+      } catch (final Throwable t) {
         scope.close();
         DatadogWrapperHelper.finishSpan(scope.span(), t);
         throw t;
@@ -192,14 +192,14 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
           futureResponse.transform(
               new AbstractFunction1<HttpResponse, HttpResponse>() {
                 @Override
-                public HttpResponse apply(HttpResponse response) {
+                public HttpResponse apply(final HttpResponse response) {
                   DatadogWrapperHelper.finishSpan(scope.span(), response);
                   return response;
                 }
               },
               new AbstractFunction1<Throwable, Throwable>() {
                 @Override
-                public Throwable apply(Throwable t) {
+                public Throwable apply(final Throwable t) {
                   DatadogWrapperHelper.finishSpan(scope.span(), t);
                   return t;
                 }
@@ -213,7 +213,7 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
   public static class AkkaHttpServerHeaders implements TextMap {
     private final HttpRequest request;
 
-    public AkkaHttpServerHeaders(HttpRequest request) {
+    public AkkaHttpServerHeaders(final HttpRequest request) {
       this.request = request;
     }
 
@@ -221,7 +221,7 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
     public Iterator<Map.Entry<String, String>> iterator() {
       final Map<String, String> javaMap = new HashMap<>(request.headers().size());
 
-      for (HttpHeader header : request.getHeaders()) {
+      for (final HttpHeader header : request.getHeaders()) {
         javaMap.put(header.name(), header.value());
       }
 
@@ -229,7 +229,7 @@ public final class AkkaHttpServerInstrumentation extends Instrumenter.Default {
     }
 
     @Override
-    public void put(String name, String value) {
+    public void put(final String name, final String value) {
       throw new IllegalStateException("akka http server headers can only be extracted");
     }
   }

@@ -70,7 +70,7 @@ public final class RatpackInstrumentation extends Instrumenter.Default {
 
   @Override
   public Map<ElementMatcher, String> transformers() {
-    Map<ElementMatcher, String> transformers = new HashMap<>();
+    final Map<ElementMatcher, String> transformers = new HashMap<>();
     transformers.put(
         isMethod().and(isStatic()).and(named("buildBaseRegistry")),
         RatpackServerAdvice.RatpackServerRegistryAdvice.class.getName());
@@ -113,7 +113,7 @@ public final class RatpackInstrumentation extends Instrumenter.Default {
 
     @Override
     public Map<ElementMatcher, String> transformers() {
-      Map<ElementMatcher, String> transformers = new HashMap<>();
+      final Map<ElementMatcher, String> transformers = new HashMap<>();
       transformers.put(
           named("register").and(takesArguments(ACTION_TYPE_DESCRIPTION)),
           RatpackServerAdvice.ExecStarterAdvice.class.getName());
@@ -155,7 +155,7 @@ public final class RatpackInstrumentation extends Instrumenter.Default {
 
     @Override
     public Map<ElementMatcher, String> transformers() {
-      Map<ElementMatcher, String> transformers = new HashMap<>();
+      final Map<ElementMatcher, String> transformers = new HashMap<>();
       transformers.put(
           named("fork").and(returns(named("ratpack.exec.ExecStarter"))),
           RatpackServerAdvice.ExecutionAdvice.class.getName());

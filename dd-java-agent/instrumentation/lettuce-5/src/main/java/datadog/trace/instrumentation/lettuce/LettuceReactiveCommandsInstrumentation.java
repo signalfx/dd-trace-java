@@ -48,7 +48,7 @@ public class LettuceReactiveCommandsInstrumentation extends Instrumenter.Default
 
   @Override
   public Map<ElementMatcher, String> transformers() {
-    Map<ElementMatcher, String> transformers = new HashMap<>();
+    final Map<ElementMatcher, String> transformers = new HashMap<>();
     transformers.put(
         isMethod()
             .and(named("createMono"))
