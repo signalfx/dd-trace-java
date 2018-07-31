@@ -3,7 +3,7 @@ package datadog.trace.instrumentation.spymemcached;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import java.util.concurrent.ExecutionException;
-import net.spy.memcached.internal.*;
+import net.spy.memcached.internal.BulkGetFuture;
 
 public class BulkGetCompletionListener extends CompletionListener<BulkGetFuture<?>>
     implements net.spy.memcached.internal.BulkGetCompletionListener {

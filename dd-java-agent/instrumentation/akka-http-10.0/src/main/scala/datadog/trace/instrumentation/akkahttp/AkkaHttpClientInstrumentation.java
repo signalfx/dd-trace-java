@@ -1,7 +1,9 @@
 package datadog.trace.instrumentation.akkahttp;
 
 import static io.opentracing.log.Fields.ERROR_OBJECT;
-import static net.bytebuddy.matcher.ElementMatchers.*;
+import static net.bytebuddy.matcher.ElementMatchers.named;
+import static net.bytebuddy.matcher.ElementMatchers.returns;
+import static net.bytebuddy.matcher.ElementMatchers.takesArgument;
 
 import akka.NotUsed;
 import akka.http.javadsl.model.headers.RawHeader;
@@ -10,7 +12,7 @@ import akka.http.scaladsl.model.HttpRequest;
 import akka.http.scaladsl.model.HttpResponse;
 import akka.stream.scaladsl.Flow;
 import com.google.auto.service.AutoService;
-import datadog.trace.agent.tooling.*;
+import datadog.trace.agent.tooling.Instrumenter;
 import datadog.trace.api.DDSpanTypes;
 import datadog.trace.api.DDTags;
 import io.opentracing.Scope;
