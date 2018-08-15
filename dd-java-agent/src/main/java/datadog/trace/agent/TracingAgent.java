@@ -71,6 +71,7 @@ public class TracingAgent {
               agentInstallerClass.getMethod("installBytebuddyAgent", Instrumentation.class);
           agentInstallerMethod.invoke(null, inst);
         }
+
         { // install global tracer
           final Class<?> tracerInstallerClass =
               agentClassLoader.loadClass("datadog.trace.agent.tooling.TracerInstaller");
@@ -79,6 +80,13 @@ public class TracingAgent {
           tracerInstallerMethod.invoke(null);
           final Method logVersionInfoMethod = tracerInstallerClass.getMethod("logVersionInfo");
           logVersionInfoMethod.invoke(null);
+        }
+
+        { // start JMX fetcher
+          final Class<?> jmxCollectorClass =
+              agentClassLoader.loadClass("datadog.trace.agent.tooling.jmx.JMXCollector");
+          final Method startMethod = jmxCollectorClass.getMethod("start");
+          startMethod.invoke(jmxCollectorClass.getConstructor().newInstance());
         }
 
         AGENT_CLASSLOADER = agentClassLoader;

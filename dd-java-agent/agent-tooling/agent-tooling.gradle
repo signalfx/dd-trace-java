@@ -17,6 +17,8 @@ dependencies {
 
   compileOnly project(':dd-trace-ot')
 
+  compile group: 'com.datadoghq', name: 'java-dogstatsd-client', version: '2.6.1'
+
   testCompile deps.opentracing
   testCompile project(':dd-java-agent:testing')
 
