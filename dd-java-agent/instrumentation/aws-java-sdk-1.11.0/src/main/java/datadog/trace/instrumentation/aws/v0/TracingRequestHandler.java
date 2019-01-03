@@ -75,7 +75,7 @@ public class TracingRequestHandler extends RequestHandler2 {
     // on http-client level may break signature.
     tracer.inject(
         scope.span().context(),
-        Format.Builtin.HTTP_HEADERS,
+        Format.Builtin.TEXT_MAP_INJECT,
         new TextMapInjectAdapter(request.getHeaders()));
 
     request.addHandlerContext(SCOPE_CONTEXT_KEY, scope);

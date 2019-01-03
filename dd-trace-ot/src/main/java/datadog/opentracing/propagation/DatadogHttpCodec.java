@@ -3,7 +3,8 @@ package datadog.opentracing.propagation;
 import datadog.opentracing.DDSpanContext;
 import datadog.trace.api.sampling.PrioritySampling;
 import io.opentracing.SpanContext;
-import io.opentracing.propagation.TextMap;
+import io.opentracing.propagation.TextMapExtract;
+import io.opentracing.propagation.TextMapInject;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URLDecoder;
@@ -28,7 +29,7 @@ public class DatadogHttpCodec {
 
   public static class Injector {
 
-    public void inject(final DDSpanContext context, final TextMap carrier) {
+    public void inject(final DDSpanContext context, final TextMapInject carrier) {
       carrier.put(TRACE_ID_KEY, String.valueOf(context.getTraceId()));
       carrier.put(SPAN_ID_KEY, String.valueOf(context.getSpanId()));
       if (context.lockSamplingPriority()) {
@@ -62,7 +63,7 @@ public class DatadogHttpCodec {
       }
     }
 
-    public SpanContext extract(final TextMap carrier) {
+    public SpanContext extract(final TextMapExtract carrier) {
 
       Map<String, String> baggage = Collections.emptyMap();
       Map<String, String> tags = Collections.emptyMap();
