@@ -29,9 +29,10 @@ dependencies {
   compile deps.opentracing
   compile group: 'io.opentracing.contrib', name: 'opentracing-tracerresolver', version: '0.1.0'
 
-  compile deps.jackson
-  compile deps.slf4j
-  compile group: 'org.msgpack', name: 'jackson-dataformat-msgpack', version: '0.8.16'
+  implementation deps.jackson
+  implementation deps.slf4j
+  implementation group: 'org.msgpack', name: 'jackson-dataformat-msgpack', version: '0.8.16'
+  implementation group: 'com.lmax', name: 'disruptor', version: '3.4.2'
 
   // We have autoservices defined in test subtree, looks like we need this to be able to properly rebuild this
   testAnnotationProcessor deps.autoservice

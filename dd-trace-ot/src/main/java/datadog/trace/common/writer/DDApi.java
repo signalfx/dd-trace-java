@@ -1,5 +1,6 @@
 package datadog.trace.common.writer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datadog.opentracing.DDSpan;
@@ -17,6 +18,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessagePacker;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
 /** The API pointing to a DD agent */
@@ -46,10 +49,10 @@ public class DDApi {
 
   DDApi(final String host, final int port, final boolean v4EndpointsAvailable) {
     if (v4EndpointsAvailable) {
-      this.tracesEndpoint = "http://" + host + ":" + port + TRACES_ENDPOINT_V4;
+      tracesEndpoint = "http://" + host + ":" + port + TRACES_ENDPOINT_V4;
     } else {
       log.debug("API v0.4 endpoints not available. Downgrading to v0.3");
-      this.tracesEndpoint = "http://" + host + ":" + port + TRACES_ENDPOINT_V3;
+      tracesEndpoint = "http://" + host + ":" + port + TRACES_ENDPOINT_V3;
     }
   }
 
@@ -70,13 +73,31 @@ public class DDApi {
    * @return the staus code returned
    */
   public boolean sendTraces(final List<List<DDSpan>> traces) {
-    final int totalSize = traceCount == null ? traces.size() : traceCount.getAndSet(0);
+    final List<byte[]> serializedTraces = new ArrayList<>(traces.size());
+    for (final List<DDSpan> trace : traces) {
+      try {
+        serializedTraces.add(objectMapper.writeValueAsBytes(trace));
+      } catch (final JsonProcessingException e) {
+        log.warn("Error serializing trace", e);
+      }
+    }
+    final int totalSize = traceCount.getAndSet(0);
+
+    return sendSerializedTraces(totalSize, serializedTraces);
+  }
+
+  boolean sendSerializedTraces(final int totalSize, final List<byte[]> traces) {
     try {
       final HttpURLConnection httpCon = getHttpURLConnection(tracesEndpoint);
       httpCon.setRequestProperty(X_DATADOG_TRACE_COUNT, String.valueOf(totalSize));
 
       final OutputStream out = httpCon.getOutputStream();
-      objectMapper.writeValue(out, traces);
+      final MessagePacker packer = MessagePack.newDefaultPacker(out);
+      packer.packArrayHeader(traces.size());
+      for (final byte[] trace : traces) {
+        packer.writePayload(trace);
+      }
+      packer.close();
       out.flush();
       out.close();
 

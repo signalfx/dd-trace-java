@@ -82,9 +82,9 @@ class DDApiTest extends Specification {
 
     // Populate thread info dynamically as it is different when run via gradle vs idea.
     where:
-    traces                                                               | expectedRequestBody
-    []                                                                   | []
-    [SpanFactory.newSpanOf(1L).setTag("service.name", "my-service")]     | [new TreeMap<>([
+    traces                                                                 | expectedRequestBody
+    []                                                                     | []
+    [[SpanFactory.newSpanOf(1L).setTag("service.name", "my-service")]]     | [[new TreeMap<>([
       "duration" : 0,
       "error"    : 0,
       "meta"     : ["span.type": "fakeType", "thread.name": Thread.currentThread().getName(), "thread.id": "${Thread.currentThread().id}"],
@@ -97,8 +97,8 @@ class DDApiTest extends Specification {
       "start"    : 1000,
       "trace_id" : 1,
       "type"     : "fakeType"
-    ])]
-    [SpanFactory.newSpanOf(100L).setTag("resource.name", "my-resource")] | [new TreeMap<>([
+    ])]]
+    [[SpanFactory.newSpanOf(100L).setTag("resource.name", "my-resource")]] | [[new TreeMap<>([
       "duration" : 0,
       "error"    : 0,
       "meta"     : ["span.type": "fakeType", "thread.name": Thread.currentThread().getName(), "thread.id": "${Thread.currentThread().id}"],
@@ -111,7 +111,7 @@ class DDApiTest extends Specification {
       "start"    : 100000,
       "trace_id" : 1,
       "type"     : "fakeType"
-    ])]
+    ])]]
   }
 
   def "Api ResponseListeners see 200 responses"() {
@@ -200,11 +200,7 @@ class DDApiTest extends Specification {
     "v0.3"          | 30000      | false
   }
 
-  static List<TreeMap<String, Object>> convertList(byte[] bytes) {
-    return mapper.readValue(bytes, new TypeReference<List<TreeMap<String, Object>>>() {})
-  }
-
-  static TreeMap<String, Object> convertMap(byte[] bytes) {
-    return mapper.readValue(bytes, new TypeReference<TreeMap<String, Object>>() {})
+  static List<List<TreeMap<String, Object>>> convertList(byte[] bytes) {
+    return mapper.readValue(bytes, new TypeReference<List<List<TreeMap<String, Object>>>>() {})
   }
 }
