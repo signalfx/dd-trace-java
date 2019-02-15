@@ -66,18 +66,6 @@ class DDApiIntegrationTest {
       [[new DDSpan(1, CONTEXT)]]                                                          | 3
       [[new DDSpan(TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis()), CONTEXT)]] | 4
     }
-
-    def "Sending bad trace fails (test #test)"() {
-      expect:
-      api.sendTraces(traces) == false
-
-      where:
-      traces         | test
-      [""]           | 1
-      ["", 123]      | 2
-      [[:]]          | 3
-      [new Object()] | 4
-    }
   }
 
   static class DDApiIntegrationV3Test extends DDApiIntegrationV4Test {

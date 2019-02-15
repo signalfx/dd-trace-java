@@ -8,11 +8,14 @@ import datadog.trace.api.sampling.PrioritySampling
 import datadog.trace.common.writer.DDAgentWriter
 import datadog.trace.common.writer.DDApi
 import spock.lang.Specification
+import spock.lang.Timeout
 
 import java.util.concurrent.TimeUnit
 
 import static datadog.opentracing.SpanFactory.newSpanOf
+import static datadog.trace.common.writer.DDAgentWriter.DISRUPTOR_BUFFER_SIZE
 
+@Timeout(5)
 class DDAgentWriterTest extends Specification {
 
   def api = Mock(DDApi)
@@ -44,16 +47,13 @@ class DDAgentWriterTest extends Specification {
     writer.start()
 
     when:
-    def start = System.nanoTime()
-    (1..20).each {
+    (1..traceCount).each {
       writer.write(trace)
     }
-    def difference = System.nanoTime() - start;
-    println "Processing took ${TimeUnit.NANOSECONDS.toMillis(difference)}ms"
     writer.flush()
 
     then:
-    1 * api.sendSerializedTraces(20, { it.size() == disruptorSize })
+    1 * api.sendSerializedTraces(traceCount, { it.size() < traceCount })
     0 * _
 
     cleanup:
@@ -61,29 +61,34 @@ class DDAgentWriterTest extends Specification {
 
     where:
     trace = [newSpanOf(0)]
-    disruptorSize = 4
+    disruptorSize = 2
+    traceCount = 100 // Shouldn't trigger payload, but bigger than the disruptor size.
   }
 
   def "test flush by size"() {
     setup:
-    def writer = new DDAgentWriter(api)
+    def writer = new DDAgentWriter(api, DISRUPTOR_BUFFER_SIZE, -1)
     def phaser = writer.apiPhaser
-    phaser.register()
     writer.start()
+    phaser.register()
 
     when:
-    (1..55).each {
+    (1..8).each {
       writer.write(trace)
     }
-    // Wait for 2 flushes of 25 from size
-    phaser.arriveAndAwaitAdvance()
-    phaser.arriveAndAwaitAdvance()
-    // Flush the remaining 5
+    // Wait for 2 flushes of 3 by size
+    phaser.awaitAdvanceInterruptibly(phaser.arrive())
+    phaser.awaitAdvanceInterruptibly(phaser.arriveAndDeregister())
+
+    then:
+    2 * api.sendSerializedTraces(3, { it.size() == 3 })
+
+    when:
+    // Flush the remaining 2
     writer.flush()
 
     then:
-    2 * api.sendSerializedTraces(25, { it.size() == 25 })
-    1 * api.sendSerializedTraces(5, { it.size() == 5 })
+    1 * api.sendSerializedTraces(2, { it.size() == 2 })
     0 * _
 
     cleanup:
@@ -91,8 +96,7 @@ class DDAgentWriterTest extends Specification {
 
     where:
     span = [newSpanOf(0)]
-    trace = (1..1000).collect { span }
-    // Each trace is 202003 bytes serialized
+    trace = (0..10000).collect { span }
   }
 
   def "test flush by time"() {
@@ -106,7 +110,7 @@ class DDAgentWriterTest extends Specification {
     (1..5).each {
       writer.write(trace)
     }
-    phaser.arriveAndAwaitAdvance()
+    phaser.awaitAdvanceInterruptibly(phaser.arriveAndDeregister())
 
     then:
     1 * api.sendSerializedTraces(5, { it.size() == 5 })
@@ -122,23 +126,22 @@ class DDAgentWriterTest extends Specification {
 
   def "test default buffer size"() {
     setup:
-    def writer = new DDAgentWriter(api, DDAgentWriter.DISRUPTOR_BUFFER_SIZE, -1)
+    def writer = new DDAgentWriter(api, DISRUPTOR_BUFFER_SIZE, -1)
     writer.start()
 
     when:
     (0..maxedPayloadTraceCount).each {
       writer.write(minimalTrace)
       def start = System.nanoTime()
-      // Busywait because we don't want to fill up the ring buffer
       // (consumer processes a trace in about 20 microseconds
-      while (System.nanoTime() - start < TimeUnit.MICROSECONDS.toNanos(50));
+      while (System.nanoTime() - start < TimeUnit.MICROSECONDS.toNanos(100)) {
+        // Busywait because we don't want to fill up the ring buffer
+      }
     }
     writer.flush()
 
     then:
     1 * api.sendSerializedTraces(maxedPayloadTraceCount, { it.size() == maxedPayloadTraceCount })
-    1 * api.sendSerializedTraces(1, { it.size() == 1 })
-    0 * _
 
     cleanup:
     writer.close()
@@ -160,7 +163,7 @@ class DDAgentWriterTest extends Specification {
       Mock(DDTracer))
     minimalSpan = new DDSpan(0, minimalContext)
     minimalTrace = [minimalSpan]
-    traceSize = DDAgentWriter.objectMapper.writeValueAsBytes(minimalTrace).length
+    traceSize = DDAgentWriter.MAPPER.writeValueAsBytes(minimalTrace).length
     maxedPayloadTraceCount = ((int) (DDAgentWriter.FLUSH_PAYLOAD_BYTES / traceSize)) + 1
   }
 

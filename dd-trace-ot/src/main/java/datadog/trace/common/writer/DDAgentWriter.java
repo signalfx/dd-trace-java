@@ -14,6 +14,7 @@ import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import datadog.opentracing.DDSpan;
+import datadog.trace.common.util.DaemonThreadFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -45,10 +46,7 @@ public class DDAgentWriter implements Writer {
         @Override
         public void translateTo(
             final Event<List<DDSpan>> event, final long sequence, final List<DDSpan> trace) {
-          final List<DDSpan> discarded = event.getAndSet(trace);
-          if (discarded != null) {
-            log.debug("Trace discarded due to spike in traces: {}", discarded);
-          }
+          event.data = trace;
         }
       };
   private static final EventTranslator<Event<List<DDSpan>>> FLUSH_TRANSLATOR =
@@ -60,30 +58,15 @@ public class DDAgentWriter implements Writer {
       };
 
   private static final ThreadFactory DISRUPTOR_THREAD_FACTORY =
-      new ThreadFactory() {
-        @Override
-        public Thread newThread(final Runnable r) {
-          final Thread thread = new Thread(r, "dd-trace-disruptor");
-          thread.setDaemon(true);
-          return thread;
-        }
-      };
+      new DaemonThreadFactory("dd-trace-disruptor");
   private static final ThreadFactory SCHEDULED_FLUSH_THREAD_FACTORY =
-      new ThreadFactory() {
-        @Override
-        public Thread newThread(final Runnable r) {
-          final Thread thread = new Thread(r, "dd-trace-writer");
-          thread.setDaemon(true);
-          return thread;
-        }
-      };
+      new DaemonThreadFactory("dd-trace-writer");
 
-  private static final ObjectMapper objectMapper = new ObjectMapper(new MessagePackFactory());
+  private static final ObjectMapper MAPPER = new ObjectMapper(new MessagePackFactory());
 
   private final DDApi api;
   private final int flushFrequencySeconds;
   private final Disruptor<Event<List<DDSpan>>> disruptor;
-  private final EventHandler consumer = new TraceConsumer();
   private final ScheduledExecutorService scheduledWriterExecutor;
   private final AtomicInteger traceCount = new AtomicInteger(0);
   private final AtomicReference<ScheduledFuture<?>> flushSchedule = new AtomicReference<>();
@@ -115,7 +98,7 @@ public class DDAgentWriter implements Writer {
             DISRUPTOR_THREAD_FACTORY,
             ProducerType.MULTI,
             new SleepingWaitStrategy(0, TimeUnit.MILLISECONDS.toNanos(5)));
-    disruptor.handleEventsWith(consumer);
+    disruptor.handleEventsWith(new TraceConsumer());
     scheduledWriterExecutor = Executors.newScheduledThreadPool(1, SCHEDULED_FLUSH_THREAD_FACTORY);
     apiPhaser = new Phaser(); // Ensure API calls are completed when flushing
     apiPhaser.register(); // Register for the executor thread.
@@ -129,7 +112,10 @@ public class DDAgentWriter implements Writer {
       if (!published) {
         // We're discarding the trace, but we still want to count it.
         traceCount.incrementAndGet();
+        log.debug("Trace written to overfilled buffer. Counted but dropping trace: {}", trace);
       }
+    } else {
+      log.debug("Trace written after shutdown. Ignoring trace: {}", trace);
     }
   }
 
@@ -156,11 +142,18 @@ public class DDAgentWriter implements Writer {
     scheduledWriterExecutor.shutdown();
   }
 
+  /** This method will block until the flush is complete. */
   public void flush() {
+    log.info("Flushing any remaining traces.");
+    // Register with the phaser so we can block until the flush completion.
     apiPhaser.register();
     disruptor.publishEvent(FLUSH_TRANSLATOR);
-    apiPhaser.arriveAndAwaitAdvance();
-    apiPhaser.arriveAndDeregister();
+    try {
+      // Allow thread to be interrupted.
+      apiPhaser.awaitAdvanceInterruptibly(apiPhaser.arriveAndDeregister());
+    } catch (final InterruptedException e) {
+      log.warn("Waiting for flush interrupted.", e);
+    }
   }
 
   @Override
@@ -189,10 +182,7 @@ public class DDAgentWriter implements Writer {
     }
   }
 
-  /**
-   * This class is not threadsafe. It should only be used by a disruptor with a single consumer (the
-   * default executor).
-   */
+  /** This class is intentionally not threadsafe. */
   private class TraceConsumer implements EventHandler<Event<List<DDSpan>>> {
     private List<byte[]> serializedTraces = new ArrayList<>();
     private int payloadSize = 0;
@@ -200,11 +190,12 @@ public class DDAgentWriter implements Writer {
     @Override
     public void onEvent(
         final Event<List<DDSpan>> event, final long sequence, final boolean endOfBatch) {
-      final List<DDSpan> trace = event.getAndSet(null);
+      final List<DDSpan> trace = event.data;
+      event.data = null; // clear the event for reuse.
       if (trace != null) {
         traceCount.incrementAndGet();
         try {
-          final byte[] serializedTrace = objectMapper.writeValueAsBytes(trace);
+          final byte[] serializedTrace = MAPPER.writeValueAsBytes(trace);
           payloadSize += serializedTrace.length;
           serializedTraces.add(serializedTrace);
         } catch (final JsonProcessingException e) {
@@ -231,7 +222,7 @@ public class DDAgentWriter implements Writer {
         final int sizeInBytes = payloadSize;
 
         // Run the actual IO task on a different thread to avoid blocking the consumer.
-        scheduledWriterExecutor.schedule(
+        scheduledWriterExecutor.execute(
             new Runnable() {
               @Override
               public void run() {
@@ -248,9 +239,7 @@ public class DDAgentWriter implements Writer {
                   apiPhaser.arrive(); // Flush completed.
                 }
               }
-            },
-            0,
-            SECONDS);
+            });
       } finally {
         payloadSize = 0;
         scheduleFlush();
@@ -258,8 +247,9 @@ public class DDAgentWriter implements Writer {
     }
   }
 
-  private static class Event<T> extends AtomicReference<T> {
+  private static class Event<T> {
     private volatile boolean shouldFlush = false;
+    private volatile T data = null;
   }
 
   private static class DisruptorEventFactory<T> implements EventFactory<Event<T>> {

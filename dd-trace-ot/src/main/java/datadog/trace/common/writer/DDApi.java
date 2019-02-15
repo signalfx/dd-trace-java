@@ -41,7 +41,7 @@ public class DDApi {
   private final AtomicInteger traceCount = new AtomicInteger(0);
   private volatile long nextAllowedLogTime = 0;
 
-  private static final ObjectMapper objectMapper = new ObjectMapper(new MessagePackFactory());
+  private static final ObjectMapper MAPPER = new ObjectMapper(new MessagePackFactory());
 
   public DDApi(final String host, final int port) {
     this(host, port, traceEndpointAvailable("http://" + host + ":" + port + TRACES_ENDPOINT_V4));
@@ -76,7 +76,7 @@ public class DDApi {
     final List<byte[]> serializedTraces = new ArrayList<>(traces.size());
     for (final List<DDSpan> trace : traces) {
       try {
-        serializedTraces.add(objectMapper.writeValueAsBytes(trace));
+        serializedTraces.add(MAPPER.writeValueAsBytes(trace));
       } catch (final JsonProcessingException e) {
         log.warn("Error serializing trace", e);
       }
@@ -145,7 +145,7 @@ public class DDApi {
         if (null != responseString
             && !"".equals(responseString.trim())
             && !"OK".equalsIgnoreCase(responseString.trim())) {
-          final JsonNode response = objectMapper.readTree(responseString);
+          final JsonNode response = MAPPER.readTree(responseString);
           for (final ResponseListener listener : responseListeners) {
             listener.onResponse(tracesEndpoint, response);
           }
@@ -196,7 +196,7 @@ public class DDApi {
       httpCon.setReadTimeout((int) TimeUnit.SECONDS.toMillis(1));
 
       final OutputStream out = httpCon.getOutputStream();
-      objectMapper.writeValue(out, data);
+      MAPPER.writeValue(out, data);
       out.flush();
       out.close();
 
