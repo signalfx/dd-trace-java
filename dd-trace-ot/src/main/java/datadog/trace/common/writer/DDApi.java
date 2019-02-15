@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.msgpack.core.MessagePack;
 import org.msgpack.core.MessagePacker;
@@ -38,7 +37,6 @@ public class DDApi {
   private final String tracesEndpoint;
   private final List<ResponseListener> responseListeners = new ArrayList<>();
 
-  private final AtomicInteger traceCount = new AtomicInteger(0);
   private volatile long nextAllowedLogTime = 0;
 
   private static final ObjectMapper MAPPER = new ObjectMapper(new MessagePackFactory());
@@ -62,10 +60,6 @@ public class DDApi {
     }
   }
 
-  public AtomicInteger getTraceCounter() {
-    return traceCount;
-  }
-
   /**
    * Send traces to the DD agent
    *
@@ -76,14 +70,17 @@ public class DDApi {
     final List<byte[]> serializedTraces = new ArrayList<>(traces.size());
     for (final List<DDSpan> trace : traces) {
       try {
-        serializedTraces.add(MAPPER.writeValueAsBytes(trace));
+        serializedTraces.add(serializeTrace(trace));
       } catch (final JsonProcessingException e) {
         log.warn("Error serializing trace", e);
       }
     }
-    final int totalSize = traceCount.getAndSet(0);
 
-    return sendSerializedTraces(totalSize, serializedTraces);
+    return sendSerializedTraces(serializedTraces.size(), serializedTraces);
+  }
+
+  byte[] serializeTrace(final List<DDSpan> trace) throws JsonProcessingException {
+    return MAPPER.writeValueAsBytes(trace);
   }
 
   boolean sendSerializedTraces(final int totalSize, final List<byte[]> traces) {

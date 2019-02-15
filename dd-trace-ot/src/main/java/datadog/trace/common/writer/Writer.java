@@ -27,6 +27,9 @@ public interface Writer extends Closeable {
   @Override
   void close();
 
+  /** Count that a trace was captured for stats, but without reporting it. */
+  void incrementTraceCount();
+
   @Slf4j
   final class Builder {
 

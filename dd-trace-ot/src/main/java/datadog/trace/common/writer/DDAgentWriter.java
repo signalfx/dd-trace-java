@@ -5,7 +5,6 @@ import static datadog.trace.api.Config.DEFAULT_TRACE_AGENT_PORT;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslator;
@@ -26,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
-import org.msgpack.jackson.dataformat.MessagePackFactory;
 
 /**
  * This writer buffers traces and sends them to the provided DDApi instance.
@@ -61,8 +59,6 @@ public class DDAgentWriter implements Writer {
       new DaemonThreadFactory("dd-trace-disruptor");
   private static final ThreadFactory SCHEDULED_FLUSH_THREAD_FACTORY =
       new DaemonThreadFactory("dd-trace-writer");
-
-  private static final ObjectMapper MAPPER = new ObjectMapper(new MessagePackFactory());
 
   private final DDApi api;
   private final int flushFrequencySeconds;
@@ -101,7 +97,7 @@ public class DDAgentWriter implements Writer {
     disruptor.handleEventsWith(new TraceConsumer());
     scheduledWriterExecutor = Executors.newScheduledThreadPool(1, SCHEDULED_FLUSH_THREAD_FACTORY);
     apiPhaser = new Phaser(); // Ensure API calls are completed when flushing
-    apiPhaser.register(); // Register for the executor thread.
+    apiPhaser.register(); // Register on behalf of the scheduled executor thread.
   }
 
   @Override
@@ -119,8 +115,9 @@ public class DDAgentWriter implements Writer {
     }
   }
 
-  public int getTotalTraces() {
-    return traceCount.get();
+  @Override
+  public void incrementTraceCount() {
+    traceCount.incrementAndGet();
   }
 
   public DDApi getApi() {
@@ -195,7 +192,7 @@ public class DDAgentWriter implements Writer {
       if (trace != null) {
         traceCount.incrementAndGet();
         try {
-          final byte[] serializedTrace = MAPPER.writeValueAsBytes(trace);
+          final byte[] serializedTrace = api.serializeTrace(trace);
           payloadSize += serializedTrace.length;
           serializedTraces.add(serializedTrace);
         } catch (final JsonProcessingException e) {
@@ -213,6 +210,7 @@ public class DDAgentWriter implements Writer {
         if (serializedTraces.isEmpty()) {
           apiPhaser.arrive(); // Allow flush to return
           return;
+          // scheduleFlush called in finally block.
         }
         final List<byte[]> toSend = serializedTraces;
         serializedTraces = new ArrayList<>(toSend.size());
