@@ -1,3 +1,3 @@
-# Datadog Java APM
+# Datadog Java APM Fork (for PRs only)
 
-To use and configure Datadog Java APM, see [https://docs.datadoghq.com/tracing/languages/java](https://docs.datadoghq.com/tracing/languages/java)
+**See [signalfx/signalfx-java-tracing](https://github.com/signalfx/signalfx-java-tracing) for our primary fork of the DD Java Agent.**
