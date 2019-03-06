@@ -23,6 +23,8 @@ import static datadog.trace.api.Config.LANGUAGE_TAG_VALUE
 import static datadog.trace.api.Config.PARTIAL_FLUSH_MIN_SPANS
 import static datadog.trace.api.Config.PREFIX
 import static datadog.trace.api.Config.PRIORITY_SAMPLING
+import static datadog.trace.api.Config.PROPAGATION_STYLE_EXTRACT
+import static datadog.trace.api.Config.PROPAGATION_STYLE_INJECT
 import static datadog.trace.api.Config.RUNTIME_CONTEXT_FIELD_INJECTION
 import static datadog.trace.api.Config.RUNTIME_ID_TAG
 import static datadog.trace.api.Config.SERVICE
@@ -44,6 +46,8 @@ class ConfigTest extends Specification {
   private static final DD_SERVICE_MAPPING_ENV = "DD_SERVICE_MAPPING"
   private static final DD_SPAN_TAGS_ENV = "DD_SPAN_TAGS"
   private static final DD_HEADER_TAGS_ENV = "DD_HEADER_TAGS"
+  private static final DD_PROPAGATION_STYLE_EXTRACT = "DD_PROPAGATION_STYLE_EXTRACT"
+  private static final DD_PROPAGATION_STYLE_INJECT = "DD_PROPAGATION_STYLE_INJECT"
   private static final DD_JMXFETCH_METRICS_CONFIGS_ENV = "DD_JMXFETCH_METRICS_CONFIGS"
   private static final DD_TRACE_AGENT_PORT_ENV = "DD_TRACE_AGENT_PORT"
   private static final DD_AGENT_PORT_LEGACY_ENV = "DD_AGENT_PORT"
@@ -66,6 +70,10 @@ class ConfigTest extends Specification {
     config.httpClientSplitByDomain == false
     config.partialFlushMinSpans == 0
     config.runtimeContextFieldInjection == true
+    config.extractDatadogHeaders == true
+    config.extractB3Headers == true
+    config.injectDatadogHeaders == true
+    config.injectB3Headers == true
     config.jmxFetchEnabled == false
     config.jmxFetchMetricsConfigs == []
     config.jmxFetchCheckPeriod == null
@@ -92,6 +100,8 @@ class ConfigTest extends Specification {
     System.setProperty(PREFIX + HTTP_CLIENT_HOST_SPLIT_BY_DOMAIN, "true")
     System.setProperty(PREFIX + PARTIAL_FLUSH_MIN_SPANS, "15")
     System.setProperty(PREFIX + RUNTIME_CONTEXT_FIELD_INJECTION, "false")
+    System.setProperty(PREFIX + PROPAGATION_STYLE_EXTRACT, "Datadog")
+    System.setProperty(PREFIX + PROPAGATION_STYLE_INJECT, "B3")
     System.setProperty(PREFIX + JMX_FETCH_ENABLED, "true")
     System.setProperty(PREFIX + JMX_FETCH_METRICS_CONFIGS, "/foo.yaml,/bar.yaml")
     System.setProperty(PREFIX + JMX_FETCH_CHECK_PERIOD, "100")
@@ -116,6 +126,10 @@ class ConfigTest extends Specification {
     config.httpClientSplitByDomain == true
     config.partialFlushMinSpans == 15
     config.runtimeContextFieldInjection == false
+    config.extractDatadogHeaders == true
+    config.extractB3Headers == false
+    config.injectDatadogHeaders == false
+    config.injectB3Headers == true
     config.jmxFetchEnabled == true
     config.jmxFetchMetricsConfigs == ["/foo.yaml", "/bar.yaml"]
     config.jmxFetchCheckPeriod == 100
@@ -128,6 +142,8 @@ class ConfigTest extends Specification {
     setup:
     environmentVariables.set(DD_SERVICE_NAME_ENV, "still something else")
     environmentVariables.set(DD_WRITER_TYPE_ENV, "LoggingWriter")
+    environmentVariables.set(DD_PROPAGATION_STYLE_EXTRACT, "B3")
+    environmentVariables.set(DD_PROPAGATION_STYLE_INJECT, "Datadog")
     environmentVariables.set(DD_JMXFETCH_METRICS_CONFIGS_ENV, "some/file")
 
     when:
@@ -136,6 +152,10 @@ class ConfigTest extends Specification {
     then:
     config.serviceName == "still something else"
     config.writerType == "LoggingWriter"
+    config.extractDatadogHeaders == false
+    config.extractB3Headers == true
+    config.injectDatadogHeaders == true
+    config.injectB3Headers == false
     config.jmxFetchMetricsConfigs == ["some/file"]
   }
 
@@ -173,6 +193,8 @@ class ConfigTest extends Specification {
     System.setProperty(PREFIX + HEADER_TAGS, "1")
     System.setProperty(PREFIX + SPAN_TAGS, "invalid")
     System.setProperty(PREFIX + HTTP_CLIENT_HOST_SPLIT_BY_DOMAIN, "invalid")
+    System.setProperty(PREFIX + PROPAGATION_STYLE_EXTRACT, "")
+    System.setProperty(PREFIX + PROPAGATION_STYLE_INJECT, " ")
 
     when:
     def config = new Config()
@@ -188,6 +210,10 @@ class ConfigTest extends Specification {
     config.mergedSpanTags == [:]
     config.headerTags == [:]
     config.httpClientSplitByDomain == false
+    config.extractDatadogHeaders == true
+    config.extractB3Headers == true
+    config.injectDatadogHeaders == true
+    config.injectB3Headers == true
   }
 
   def "sys props and env vars overrides for trace_agent_port and agent_port_legacy as expected"() {
@@ -248,6 +274,8 @@ class ConfigTest extends Specification {
     properties.setProperty(HEADER_TAGS, "e:5")
     properties.setProperty(HTTP_CLIENT_HOST_SPLIT_BY_DOMAIN, "true")
     properties.setProperty(PARTIAL_FLUSH_MIN_SPANS, "15")
+    properties.setProperty(PROPAGATION_STYLE_EXTRACT, "Datadog")
+    properties.setProperty(PROPAGATION_STYLE_INJECT, "B3")
     properties.setProperty(JMX_FETCH_METRICS_CONFIGS, "/foo.yaml,/bar.yaml")
     properties.setProperty(JMX_FETCH_CHECK_PERIOD, "100")
     properties.setProperty(JMX_FETCH_REFRESH_BEANS_PERIOD, "200")
@@ -270,6 +298,10 @@ class ConfigTest extends Specification {
     config.headerTags == [e: "5"]
     config.httpClientSplitByDomain == true
     config.partialFlushMinSpans == 15
+    config.extractDatadogHeaders == true
+    config.extractB3Headers == false
+    config.injectDatadogHeaders == false
+    config.injectB3Headers == true
     config.jmxFetchMetricsConfigs == ["/foo.yaml", "/bar.yaml"]
     config.jmxFetchCheckPeriod == 100
     config.jmxFetchRefreshBeansPeriod == 200
